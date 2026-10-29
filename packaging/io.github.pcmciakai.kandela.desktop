@@ -1,0 +1,9 @@
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Type=Application
+Name=Kandela
+Comment=Control Philips Hue lights
+Exec=kandela
+Icon=io.github.pcmciakai.kandela
+Categories=Utility;Qt;KDE;
+Keywords=hue;philips;lights;smart home;

@@ -1,0 +1,7 @@
+/target
+.qmlls.ini
+# Flatpak build output
+/.flatpak-builder/
+/build-dir/
+/repo/
+*.flatpak
