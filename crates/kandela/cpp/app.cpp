@@ -25,17 +25,24 @@ QString instanceSocketName()
     return runtime + QStringLiteral("/kandela.sock");
 }
 
-// If another instance is running, asks it to show its window and returns true.
-bool activateRunningInstance()
+enum class OtherInstance { None, Activated, Unresponsive };
+
+// If another instance is running, asks it to show its window.
+OtherInstance activateRunningInstance()
 {
     QLocalSocket socket;
     socket.connectToServer(instanceSocketName());
-    if (!socket.waitForConnected(500)) {
-        return false;
+    if (!socket.waitForConnected(3000)) {
+        const auto error = socket.error();
+        // Only these mean nobody is listening; a timeout means a busy instance.
+        if (error == QLocalSocket::ServerNotFoundError || error == QLocalSocket::ConnectionRefusedError) {
+            return OtherInstance::None;
+        }
+        return OtherInstance::Unresponsive;
     }
     socket.write("show\n");
-    socket.waitForBytesWritten(500);
-    return true;
+    socket.waitForBytesWritten(1000);
+    return OtherInstance::Activated;
 }
 }
 
@@ -52,8 +59,24 @@ std::int32_t run_app(bool start_hidden, bool single_instance)
     // The window may be hidden in the tray; Main.qml decides when to quit.
     QApplication::setQuitOnLastWindowClosed(false);
 
-    if (single_instance && activateRunningInstance()) {
-        return 0;
+    // Starting the app again brings this instance's window up instead.
+    QLocalServer server;
+    if (single_instance) {
+        switch (activateRunningInstance()) {
+        case OtherInstance::Activated:
+            return 0;
+        case OtherInstance::Unresponsive:
+            qWarning("Kandela is already running but not responding");
+            return 1;
+        case OtherInstance::None:
+            // Any socket file left is stale (e.g. after a crash).
+            QLocalServer::removeServer(instanceSocketName());
+            server.setSocketOptions(QLocalServer::UserAccessOption);
+            if (!server.listen(instanceSocketName())) {
+                qWarning("Kandela could not listen on %s: %s", qPrintable(server.fullServerName()), qPrintable(server.errorString()));
+            }
+            break;
+        }
     }
     QApplication::setApplicationDisplayName(QStringLiteral("Kandela"));
     QApplication::setDesktopFileName(QStringLiteral("io.github.pcmciakai.kandela"));
@@ -82,12 +105,7 @@ std::int32_t run_app(bool start_hidden, bool single_instance)
     });
     engine.loadFromModule("io.github.pcmciakai.kandela", "Main");
 
-    // Starting the app again brings this instance's window up instead.
-    QLocalServer server;
-    if (single_instance) {
-        QLocalServer::removeServer(instanceSocketName());
-        server.setSocketOptions(QLocalServer::UserAccessOption);
-        server.listen(instanceSocketName());
+    if (server.isListening()) {
         QObject::connect(&server, &QLocalServer::newConnection, &server, [&server, &engine] {
             while (QLocalSocket *client = server.nextPendingConnection()) {
                 QObject::connect(client, &QLocalSocket::disconnected, client, &QObject::deleteLater);

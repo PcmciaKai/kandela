@@ -39,7 +39,13 @@ pub struct Pairing {
 fn http_client(verifier: &Arc<PinnedVerifier>, timeout: Option<Duration>) -> reqwest::Client {
     let mut builder = reqwest::Client::builder()
         .tls_backend_preconfigured(verifier.client_config())
-        .connect_timeout(Duration::from_secs(5));
+        .connect_timeout(Duration::from_secs(5))
+        // The event stream can be quiet for hours. Keepalive probes notice a
+        // bridge that vanished without closing the connection (power or Wi-Fi
+        // loss) within about a minute, so the stream gets reopened.
+        .tcp_keepalive(Duration::from_secs(30))
+        .tcp_keepalive_interval(Duration::from_secs(10))
+        .tcp_keepalive_retries(3u32);
     if let Some(t) = timeout {
         builder = builder.timeout(t);
     }
@@ -148,6 +154,10 @@ impl Bridge {
         }
     }
 
+    pub fn address(&self) -> &str {
+        &self.address
+    }
+
     fn connection_error(&self, e: reqwest::Error) -> Error {
         if self.verifier.mismatched() {
             Error::CertificateMismatch
@@ -248,17 +258,20 @@ impl Bridge {
 /// Splits a server-sent event stream into the `data` payload of each event.
 #[derive(Default)]
 struct SseParser {
-    buffer: String,
+    // Raw bytes: a chunk can end in the middle of a multi-byte character, so
+    // only complete lines are decoded.
+    buffer: Vec<u8>,
     data: String,
 }
 
 impl SseParser {
     fn push(&mut self, chunk: &[u8]) -> Vec<String> {
-        self.buffer.push_str(&String::from_utf8_lossy(chunk));
+        self.buffer.extend_from_slice(chunk);
         let mut out = Vec::new();
-        while let Some(pos) = self.buffer.find('\n') {
-            let line = self.buffer[..pos].trim_end_matches('\r').to_owned();
-            self.buffer.drain(..=pos);
+        while let Some(pos) = self.buffer.iter().position(|&b| b == b'\n') {
+            let raw: Vec<u8> = self.buffer.drain(..=pos).collect();
+            let line = String::from_utf8_lossy(&raw[..pos]);
+            let line = line.trim_end_matches('\r');
             if line.is_empty() {
                 if !self.data.is_empty() {
                     out.push(std::mem::take(&mut self.data));
@@ -284,6 +297,15 @@ mod tests {
         assert!(p.push(b": hi\n\nid: 1:0\ndata: [{\"a\"").is_empty());
         let out = p.push(b":1}]\n\n");
         assert_eq!(out, vec!["[{\"a\":1}]".to_owned()]);
+    }
+
+    #[test]
+    fn sse_parser_keeps_characters_split_across_chunks() {
+        let mut p = SseParser::default();
+        let text = "data: [\"K\u{fc}che\"]\n\n".as_bytes();
+        let split = text.iter().position(|&b| b == 0xc3).unwrap() + 1;
+        assert!(p.push(&text[..split]).is_empty());
+        assert_eq!(p.push(&text[split..]), vec!["[\"K\u{fc}che\"]".to_owned()]);
     }
 
     #[test]

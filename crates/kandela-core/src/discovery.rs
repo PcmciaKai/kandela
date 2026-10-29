@@ -69,6 +69,8 @@ pub async fn discover() -> Vec<BridgeInfo> {
             Err(e) => log::info!("{address} did not answer as a bridge: {e}"),
         }
     }
-    bridges.dedup_by(|a, b| !a.id.is_empty() && a.id == b.id);
+    // The same bridge can answer at more than one address.
+    let mut seen = std::collections::HashSet::new();
+    bridges.retain(|b| b.id.is_empty() || seen.insert(b.id.clone()));
     bridges
 }

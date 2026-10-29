@@ -117,10 +117,15 @@ Kirigami.ScrollablePage {
         Kirigami.InlineMessage {
             Layout.fillWidth: true
             position: Kirigami.InlineMessage.Position.Header
-            visible: page.hue.status === "connected" && page.hue.message.length > 0
+            // Not showCloseButton: it hides the message by breaking this binding.
+            visible: page.hue.status === "connected" && page.hue.errorMessage.length > 0
             type: Kirigami.MessageType.Error
-            showCloseButton: true
-            text: page.hue.message
+            text: page.hue.errorMessage
+            actions: Kirigami.Action {
+                text: page.app.i18n("Dismiss")
+                icon.name: "dialog-close"
+                onTriggered: page.hue.errorMessage = ""
+            }
         }
     }
 

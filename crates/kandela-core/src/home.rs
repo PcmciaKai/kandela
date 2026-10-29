@@ -292,10 +292,23 @@ impl Home {
                     json!({"on": {"on": true}, "color": {"xy": {"x": x, "y": y}}}),
                 )]
             }
-            Command::LightTemperature { id, mirek } => vec![light(
-                id,
-                json!({"on": {"on": true}, "color_temperature": {"mirek": mirek}}),
-            )],
+            Command::LightTemperature { id, mirek } => {
+                // Lights support different ranges; the bridge rejects values
+                // outside the light's own.
+                let range = |ptr: &str, default: u64| {
+                    self.get(id)
+                        .and_then(|l| l.pointer(ptr))
+                        .and_then(Value::as_u64)
+                        .unwrap_or(default)
+                };
+                let min = range("/color_temperature/mirek_schema/mirek_minimum", 153);
+                let max = range("/color_temperature/mirek_schema/mirek_maximum", 500).max(min);
+                let mirek = u64::from(*mirek).clamp(min, max);
+                vec![light(
+                    id,
+                    json!({"on": {"on": true}, "color_temperature": {"mirek": mirek}}),
+                )]
+            }
             Command::GroupOn { id, on } => vec![group(id, json!({"on": {"on": on}}))],
             Command::GroupBrightness { id, brightness } => vec![group(
                 id,
@@ -717,6 +730,25 @@ mod tests {
         });
         assert_eq!(reqs[0].body["on"]["on"], json!(true));
         assert_eq!(reqs[0].body["dimming"]["brightness"], json!(40.0));
+    }
+
+    #[test]
+    fn temperature_is_clamped_to_the_lights_range() {
+        let mut resources = demo::resources();
+        let light = resources
+            .iter_mut()
+            .find(|r| r["type"] == "light" && r.get("color_temperature").is_some())
+            .unwrap();
+        light["color_temperature"]["mirek_schema"]["mirek_maximum"] = json!(454);
+        let id = light["id"].as_str().unwrap().to_owned();
+        let home = Home::from_resources(resources);
+        let warm = home.requests_for(&Command::LightTemperature {
+            id: id.clone(),
+            mirek: 500,
+        });
+        assert_eq!(warm[0].body["color_temperature"]["mirek"], json!(454));
+        let cool = home.requests_for(&Command::LightTemperature { id, mirek: 100 });
+        assert_eq!(cool[0].body["color_temperature"]["mirek"], json!(153));
     }
 
     #[test]

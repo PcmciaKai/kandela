@@ -3,9 +3,9 @@
 //! through a callback.
 
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use tokio::sync::mpsc;
+use tokio::sync::{Notify, mpsc};
 use tokio::task::JoinHandle;
 
 use crate::bridge::{self, Bridge, BridgeInfo};
@@ -54,6 +54,9 @@ pub enum Update {
         state: &'static str,
         message: String,
     },
+    /// A command was rejected or couldn't be sent. The connection status is
+    /// reported separately.
+    CommandFailed(String),
 }
 
 type Sink = Arc<dyn Fn(Update) + Send + Sync>;
@@ -98,6 +101,7 @@ struct Worker {
     sink: Sink,
     tx: mpsc::UnboundedSender<Request>,
     home: Arc<Mutex<Home>>,
+    publisher: Publisher,
     mode: Mode,
     connection: Option<JoinHandle<()>>,
     pairing: Option<JoinHandle<()>>,
@@ -112,10 +116,32 @@ struct Outgoing {
     requests: Vec<home::Request>,
 }
 
-fn emit_home(sink: &Sink, home: &Home) {
-    match serde_json::to_string(&home.snapshot()) {
-        Ok(json) => sink(Update::Home(json)),
-        Err(e) => log::error!("snapshot serialisation failed: {e}"),
+/// Tells the UI the home changed. Snapshots are sent at most once per frame,
+/// so dragging a slider doesn't rebuild and re-render the home 60 times a
+/// second.
+#[derive(Clone)]
+struct Publisher(Arc<Notify>);
+
+impl Publisher {
+    fn start(home: Arc<Mutex<Home>>, sink: Sink) -> Self {
+        let notify = Arc::new(Notify::new());
+        let changed = notify.clone();
+        tokio::spawn(async move {
+            loop {
+                changed.notified().await;
+                let snapshot = home.lock().unwrap().snapshot();
+                match serde_json::to_string(&snapshot) {
+                    Ok(json) => sink(Update::Home(json)),
+                    Err(e) => log::error!("snapshot serialisation failed: {e}"),
+                }
+                tokio::time::sleep(Duration::from_millis(30)).await;
+            }
+        });
+        Self(notify)
+    }
+
+    fn changed(&self) {
+        self.0.notify_one();
     }
 }
 
@@ -140,10 +166,12 @@ impl Worker {
     fn new(sink: Sink, tx: mpsc::UnboundedSender<Request>) -> Self {
         let (outbox, outbox_rx) = mpsc::unbounded_channel();
         tokio::spawn(send_loop(outbox_rx, sink.clone()));
+        let home: Arc<Mutex<Home>> = Arc::default();
         Self {
+            publisher: Publisher::start(home.clone(), sink.clone()),
             sink,
             tx,
-            home: Arc::default(),
+            home,
             mode: Mode::Idle,
             connection: None,
             pairing: None,
@@ -178,9 +206,8 @@ impl Worker {
             Request::StartDemo => {
                 self.disconnect();
                 self.mode = Mode::Demo;
-                let mut home = self.home.lock().unwrap();
-                *home = Home::from_resources(demo::resources());
-                emit_home(&self.sink, &home);
+                *self.home.lock().unwrap() = Home::from_resources(demo::resources());
+                self.publisher.changed();
                 status(&self.sink, "demo", "Demo home", "");
             }
             Request::Forget => {
@@ -211,7 +238,7 @@ impl Worker {
     fn setup(&mut self, message: &str) {
         self.disconnect();
         *self.home.lock().unwrap() = Home::default();
-        emit_home(&self.sink, &Home::default());
+        self.publisher.changed();
         status(&self.sink, "setup", "", message);
         self.discover();
     }
@@ -299,6 +326,7 @@ impl Worker {
         self.mode = Mode::Bridge(bridge.clone());
         let sink = self.sink.clone();
         let home = self.home.clone();
+        let publisher = self.publisher.clone();
         let tx = self.tx.clone();
         self.connection = Some(tokio::spawn(async move {
             let name = cfg.bridge_name;
@@ -309,13 +337,10 @@ impl Worker {
                 }
                 match bridge.resources().await {
                     Ok(resources) => {
-                        backoff = Duration::from_secs(1);
-                        {
-                            let mut h = home.lock().unwrap();
-                            *h = Home::from_resources(resources);
-                            emit_home(&sink, &h);
-                        }
+                        *home.lock().unwrap() = Home::from_resources(resources);
+                        publisher.changed();
                         status(&sink, "connected", &name, "");
+                        let opened = Instant::now();
                         let result = bridge
                             .stream_events(|events| {
                                 let mut h = home.lock().unwrap();
@@ -324,13 +349,21 @@ impl Worker {
                                     changed |= h.apply_event(e);
                                 }
                                 if changed {
-                                    emit_home(&sink, &h);
+                                    publisher.changed();
                                 }
                             })
                             .await;
                         if let Err(e) = result {
                             log::warn!("event stream ended: {e}");
                         }
+                        // Reconnect quickly after a long-lived stream drops, but
+                        // back off if the bridge keeps ending it straight away.
+                        if opened.elapsed() > Duration::from_secs(60) {
+                            backoff = Duration::from_secs(1);
+                        } else {
+                            backoff = (backoff * 2).min(Duration::from_secs(30));
+                        }
+                        tokio::time::sleep(backoff).await;
                     }
                     Err(bridge::Error::Unauthorized) => {
                         config::remove();
@@ -359,9 +392,9 @@ impl Worker {
             let mut home = self.home.lock().unwrap();
             let requests = home.requests_for(&command);
             home.apply_locally(&command, simulate);
-            emit_home(&self.sink, &home);
             requests
         };
+        self.publisher.changed();
         if let Mode::Bridge(bridge) = &self.mode {
             let _ = self.outbox.send(Outgoing {
                 key: command.coalesce_key(),
@@ -422,14 +455,16 @@ async fn send_loop(mut rx: mpsc::UnboundedReceiver<Outgoing>, sink: Sink) {
         }
         for out in batch {
             for req in &out.requests {
-                if let Err(e) = out.bridge.send(req).await {
-                    log::warn!("{} {} failed: {e}", req.rtype, req.id);
-                    let untrusted = matches!(e, bridge::Error::CertificateMismatch);
-                    sink(Update::Status {
-                        status: if untrusted { "untrusted" } else { "connected" },
-                        bridge_name: String::new(),
-                        message: e.to_string(),
-                    });
+                match out.bridge.send(req).await {
+                    Ok(()) => {}
+                    Err(e @ bridge::Error::CertificateMismatch) => {
+                        log::warn!("{} {} refused: {e}", req.rtype, req.id);
+                        status(&sink, "untrusted", "", out.bridge.address());
+                    }
+                    Err(e) => {
+                        log::warn!("{} {} failed: {e}", req.rtype, req.id);
+                        sink(Update::CommandFailed(e.to_string()));
+                    }
                 }
             }
         }

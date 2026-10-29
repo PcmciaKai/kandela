@@ -17,9 +17,12 @@ Platform.SystemTrayIcon {
     }
 
     // SystemTrayIcon takes no child objects, so helpers live in properties.
-    readonly property ListModel groupIds: ListModel {}
+    // Menu items can't be moved, so the menu is rebuilt whenever the rooms
+    // and zones or their order change (not on every state update).
+    property var groupIds: []
     function sync() {
-        app.syncIds(groupIds, app.home.rooms.concat(app.home.zones).map(g => g.id));
+        const ids = app.home.rooms.concat(app.home.zones).map(g => g.id);
+        if (JSON.stringify(ids) !== JSON.stringify(groupIds)) groupIds = ids;
     }
     readonly property Connections homeWatcher: Connections {
         target: tray.app
@@ -54,8 +57,8 @@ Platform.SystemTrayIcon {
     readonly property Instantiator groupItems: Instantiator {
         model: tray.groupIds
         delegate: Platform.MenuItem {
-            required property string itemId
-            readonly property var entry: tray.app.group(itemId)
+            required property string modelData
+            readonly property var entry: tray.app.group(modelData)
             text: entry?.name ?? ""
             checkable: true
             checked: entry?.on ?? false

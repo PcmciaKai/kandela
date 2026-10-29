@@ -21,6 +21,8 @@ pub mod qobject {
         #[qproperty(bool, discovering)]
         #[qproperty(QString, pairing_state)]
         #[qproperty(QString, pairing_message)]
+        // The last command the bridge rejected; QML clears it when dismissed.
+        #[qproperty(QString, error_message)]
         type HueController = super::HueControllerRust;
 
         #[qinvokable]
@@ -78,6 +80,7 @@ pub struct HueControllerRust {
     discovering: bool,
     pairing_state: QString,
     pairing_message: QString,
+    error_message: QString,
     service: Option<Service>,
 }
 
@@ -92,6 +95,7 @@ impl Default for HueControllerRust {
             discovering: false,
             pairing_state: QString::from("idle"),
             pairing_message: QString::default(),
+            error_message: QString::default(),
             service: None,
         }
     }
@@ -120,6 +124,9 @@ impl cxx_qt::Initialize for qobject::HueController {
                         Update::Discovering(d) => obj.as_mut().set_discovering(d),
                         Update::Bridges(json) => {
                             obj.as_mut().set_bridges_json(QString::from(&json))
+                        }
+                        Update::CommandFailed(message) => {
+                            obj.as_mut().set_error_message(QString::from(&message));
                         }
                         Update::Pairing { state, message } => {
                             obj.as_mut().set_pairing_message(QString::from(&message));
@@ -204,7 +211,8 @@ impl qobject::HueController {
     pub fn set_light_mirek(&self, id: &QString, mirek: f64) {
         self.command(Command::LightTemperature {
             id: id.to_string(),
-            mirek: mirek.round().clamp(153.0, 500.0) as u16,
+            // Clamped to the light's own range in kandela-core.
+            mirek: mirek.round().clamp(0.0, f64::from(u16::MAX)) as u16,
         });
     }
 
