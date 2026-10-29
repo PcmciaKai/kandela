@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.pcmciakai.kandela</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <name>Kandela</name>
+  <summary>Control your Philips Hue lights</summary>
+
+  <developer id="io.github.pcmciakai">
+    <name>PcmciaKai</name>
+  </developer>
+
+  <description>
+    <p>
+      Kandela controls Philips Hue lights from your desktop. It talks to your
+      Hue Bridge directly over your home network, so no Hue account or
+      internet connection is needed.
+    </p>
+    <ul>
+      <li>Switch and dim every room and zone at a glance</li>
+      <li>Recall scenes and control individual lights</li>
+      <li>Pick colors on a color wheel, or warm and cool white tones</li>
+      <li>See changes from the phone app and wall switches live</li>
+      <li>Keep it running in the system tray for quick access</li>
+    </ul>
+    <p>
+      Kandela is an independent project and is not affiliated with or
+      endorsed by Philips or Signify.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">io.github.pcmciakai.kandela.desktop</launchable>
+  <provides>
+    <binary>kandela</binary>
+  </provides>
+
+  <url type="homepage">https://github.com/PcmciaKai/kandela</url>
+  <url type="bugtracker">https://github.com/PcmciaKai/kandela/issues</url>
+  <url type="vcs-browser">https://github.com/PcmciaKai/kandela</url>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Rooms and zones next to the scenes and lights of a room</caption>
+      <image>https://raw.githubusercontent.com/PcmciaKai/kandela/main/docs/screenshot.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Picking colors for each light on a color wheel</caption>
+      <image>https://raw.githubusercontent.com/PcmciaKai/kandela/main/docs/screenshot-colors.png</image>
+    </screenshot>
+  </screenshots>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#fde6c3</color>
+    <color type="primary" scheme_preference="dark">#5c3a1e</color>
+  </branding>
+
+  <categories>
+    <category>Utility</category>
+  </categories>
+  <keywords>
+    <keyword>hue</keyword>
+    <keyword>philips</keyword>
+    <keyword>lights</keyword>
+    <keyword>smart home</keyword>
+  </keywords>
+
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="0.1.0" date="2026-10-29">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

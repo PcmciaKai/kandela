@@ -1,0 +1,46 @@
+id: io.github.pcmciakai.kandela
+runtime: org.kde.Platform
+runtime-version: '6.11'
+sdk: org.kde.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: kandela
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # Talking to the Hue Bridge on the local network, and finding it via mDNS.
+  - --share=network
+  # The system tray icon and its "still running" notification.
+  - --talk-name=org.kde.StatusNotifierWatcher
+  - --talk-name=org.freedesktop.Notifications
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    # cargo-sources.json vendors every crate here; see gen_cargo_sources.py.
+    CARGO_HOME: /run/build/kandela/cargo
+    CARGO_NET_OFFLINE: 'true'
+
+modules:
+  - name: kandela
+    buildsystem: simple
+    build-commands:
+      - cargo --offline build --release --locked -p kandela
+      - install -Dm755 target/release/kandela -t /app/bin/
+      - install -Dm644 packaging/io.github.pcmciakai.kandela.desktop -t /app/share/applications/
+      - install -Dm644 packaging/io.github.pcmciakai.kandela.metainfo.xml -t /app/share/metainfo/
+      - install -Dm644 packaging/io.github.pcmciakai.kandela.svg -t /app/share/icons/hicolor/scalable/apps/
+    sources:
+      # For a Flathub submission, replace this with a git source pointing at a
+      # release tag.
+      - type: dir
+        path: ../..
+        skip:
+          - target
+          - .flatpak-builder
+          - build-dir
+          - repo
+      - cargo-sources.json

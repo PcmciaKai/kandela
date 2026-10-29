@@ -71,6 +71,43 @@ sed 's|^Exec=kandela$|Exec=kandela --hidden|' packaging/io.github.pcmciakai.kand
 
 Starting the app while it's already running brings up the existing window.
 
+## Flatpak
+
+Kandela is packaged as a Flatpak on the KDE 6.11 runtime, which provides Qt,
+Kirigami and the Breeze style, so the package itself is under 10 MB. Needs
+`flatpak-builder` and the SDKs:
+
+```sh
+flatpak install --user flathub org.flatpak.Builder org.kde.Sdk//6.11 org.freedesktop.Sdk.Extension.rust-stable//25.08
+```
+
+Build and install for your user:
+
+```sh
+flatpak run --env=FLATPAK_USER_DIR=$HOME/.local/share/flatpak --command=flatpak-builder org.flatpak.Builder \
+  --user --install --force-clean --state-dir=.flatpak-builder build-dir packaging/flatpak/io.github.pcmciakai.kandela.yml
+flatpak run io.github.pcmciakai.kandela
+```
+
+The sandbox only gets network access (for the bridge and mDNS), the display,
+and D-Bus access to the system tray and notifications. Its settings live in
+`~/.var/app/io.github.pcmciakai.kandela/`, so it is paired separately from a
+native build.
+
+Rust dependencies are vendored for the offline Flatpak build through
+`packaging/flatpak/cargo-sources.json`. Regenerate it whenever `Cargo.lock`
+changes:
+
+```sh
+python3 packaging/flatpak/gen_cargo_sources.py Cargo.lock packaging/flatpak/cargo-sources.json
+```
+
+To start the Flatpak in the tray when you log in:
+
+```sh
+sed 's|^Exec=kandela$|Exec=flatpak run io.github.pcmciakai.kandela --hidden|' packaging/io.github.pcmciakai.kandela.desktop > ~/.config/autostart/io.github.pcmciakai.kandela.desktop
+```
+
 ## Layout
 
 | Path | What it is |

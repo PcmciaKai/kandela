@@ -9,9 +9,20 @@
 
 namespace
 {
+// A socket path every instance of this user's Kandela can see. Inside a
+// Flatpak, /tmp is private to each instance, but $XDG_RUNTIME_DIR/app/<id> is
+// shared between them.
 QString instanceSocketName()
 {
-    return QStringLiteral("kandela-%1").arg(qEnvironmentVariable("USER"));
+    const QString runtime = qEnvironmentVariable("XDG_RUNTIME_DIR");
+    if (runtime.isEmpty()) {
+        return QStringLiteral("kandela-%1").arg(qEnvironmentVariable("USER"));
+    }
+    const QString flatpakId = qEnvironmentVariable("FLATPAK_ID");
+    if (!flatpakId.isEmpty()) {
+        return QStringLiteral("%1/app/%2/kandela.sock").arg(runtime, flatpakId);
+    }
+    return runtime + QStringLiteral("/kandela.sock");
 }
 
 // If another instance is running, asks it to show its window and returns true.
