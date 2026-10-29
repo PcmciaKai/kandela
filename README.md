@@ -81,13 +81,19 @@ Kirigami and the Breeze style, so the package itself is under 10 MB. Needs
 flatpak install --user flathub org.flatpak.Builder org.kde.Sdk//6.11 org.freedesktop.Sdk.Extension.rust-stable//25.08
 ```
 
-Build and install for your user:
+Build into a local repository, then install from it with your system's
+`flatpak`:
 
 ```sh
 flatpak run --env=FLATPAK_USER_DIR=$HOME/.local/share/flatpak --command=flatpak-builder org.flatpak.Builder \
-  --user --install --force-clean --state-dir=.flatpak-builder build-dir packaging/flatpak/io.github.pcmciakai.kandela.yml
-flatpak run io.github.pcmciakai.kandela
+  --user --force-clean --repo=repo --state-dir=.flatpak-builder build-dir packaging/flatpak/io.github.pcmciakai.kandela.yml
+flatpak --user remote-add --if-not-exists --no-gpg-verify kandela-local repo
+flatpak --user install --reinstall kandela-local io.github.pcmciakai.kandela
 ```
+
+Don't use `flatpak-builder --install` here: flatpak-builder runs in its own
+sandbox, and the menu entry it installs would point at that sandbox's
+`/app/bin/flatpak`, so the app wouldn't start from the application menu.
 
 The sandbox only gets network access (for the bridge and mDNS), the display,
 and D-Bus access to the system tray and notifications. Its settings live in
