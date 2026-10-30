@@ -1,5 +1,9 @@
 # Kandela
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20KDE%20Plasma-green.svg)](https://kde.org/plasma-desktop/)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20me-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/pcmciakai)
+
 Kandela is a desktop app for Philips Hue lights, built for KDE Plasma (it also runs on other
 desktops). It talks to your Hue Bridge directly over the local network, so no
 Hue account or internet connection is needed.
