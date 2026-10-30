@@ -1,6 +1,6 @@
 [package]
 name = "kandela"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license.workspace = true
 description = "Control Philips Hue lights from the Linux desktop"
@@ -14,7 +14,7 @@ cxx = "1.0.205"
 cxx-qt = "0.10.0"
 cxx-qt-lib = { version = "0.10.0", features = ["qt_gui", "qt_qml", "qt_quickcontrols"] }
 env_logger = "0.11.11"
-kandela-core = { version = "0.1.0", path = "../kandela-core" }
+kandela-core = { version = "0.1.1", path = "../kandela-core" }
 log = "0.4.34"
 
 [build-dependencies]

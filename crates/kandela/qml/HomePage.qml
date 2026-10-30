@@ -11,6 +11,7 @@ Kirigami.ScrollablePage {
 
     // Screenshots of the demo should look like a real home.
     readonly property bool showDemoHints: hue.status === "demo" && app.screenshotPath.length === 0
+                                          && app.screenshotRoute.length === 0
 
     title: showDemoHints ? app.i18n("Demo Home") : app.i18n("Home")
 

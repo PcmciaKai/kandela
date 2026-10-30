@@ -9,7 +9,8 @@ Kirigami.ApplicationWindow {
 
     title: i18n("Kandela")
     width: Kirigami.Units.gridUnit * 52
-    height: Kirigami.Units.gridUnit * 38
+    // Fits Flathub's screenshot guideline (at most 1000x700 with the title bar).
+    height: Kirigami.Units.gridUnit * 36
     minimumWidth: Kirigami.Units.gridUnit * 20
     minimumHeight: Kirigami.Units.gridUnit * 24
 
@@ -155,7 +156,7 @@ Kirigami.ApplicationWindow {
     property string screenshotPath
     property string screenshotRoute
     Timer {
-        running: root.screenshotPath.length > 0
+        running: root.screenshotPath.length > 0 || root.screenshotRoute.length > 0
         interval: 1500
         onTriggered: {
             const [kind, name] = root.screenshotRoute.split(":");
@@ -166,7 +167,7 @@ Kirigami.ApplicationWindow {
                 root.openColors(g.id, kind === "white" ? "" : (g.lightIds[0] ?? ""));
                 if (kind === "white") root.pageStack.currentItem.whiteMode = true;
             }
-            grabTimer.start();
+            if (root.screenshotPath.length > 0) grabTimer.start();
         }
     }
     Timer {

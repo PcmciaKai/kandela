@@ -42,11 +42,11 @@
   <screenshots>
     <screenshot type="default">
       <caption>Rooms and zones next to the scenes and lights of a room</caption>
-      <image>https://raw.githubusercontent.com/PcmciaKai/kandela/main/docs/screenshot.png</image>
+      <image>https://raw.githubusercontent.com/PcmciaKai/kandela/v0.1.1/docs/screenshot.png</image>
     </screenshot>
     <screenshot>
       <caption>Picking colors for each light on a color wheel</caption>
-      <image>https://raw.githubusercontent.com/PcmciaKai/kandela/main/docs/screenshot-colors.png</image>
+      <image>https://raw.githubusercontent.com/PcmciaKai/kandela/v0.1.1/docs/screenshot-colors.png</image>
     </screenshot>
   </screenshots>
 
@@ -76,6 +76,18 @@
   <content_rating type="oars-1.1" />
 
   <releases>
+    <release version="0.1.1" date="2026-10-30">
+      <description>
+        <p>Reliability fixes:</p>
+        <ul>
+          <li>Notices when the bridge disappears from the network and reconnects</li>
+          <li>Room and scene names with characters like ü no longer get garbled</li>
+          <li>Warm and cool white stay within each light's supported range</li>
+          <li>Errors from the bridge no longer hide the connection status</li>
+          <li>Starting Kandela twice reliably opens the running window</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-10-30">
       <description>
         <p>First release.</p>

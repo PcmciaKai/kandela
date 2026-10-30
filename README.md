@@ -140,6 +140,14 @@ KANDELA_SCREENSHOT=/tmp/shot.png KANDELA_ROUTE="colors:Living room" \
 
 Routes: `home:`, `group:<name>`, `colors:<name>`, `white:<name>`.
 
+Without `KANDELA_SCREENSHOT`, the route just opens that page in a normal
+window, for taking screenshots of the real window with Spectacle's "Active
+Window" mode (which is what Flathub asks for):
+
+```sh
+KANDELA_ROUTE="group:Living room" cargo run -p kandela -- --demo
+```
+
 ## Known limitations
 
 - No editing of scenes, rooms or automations yet; use the phone app for those.
